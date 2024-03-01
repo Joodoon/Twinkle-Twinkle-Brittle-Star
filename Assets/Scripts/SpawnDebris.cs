@@ -2,48 +2,56 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class SpawnDebris : MonoBehaviour
 {
     [SerializeField] GameObject debris;
+    [SerializeField] GameObject player;
+    [SerializeField] GravityManager gravity;
 
-    ArrayList debrisList = new ArrayList();
+    // Start is called before the first frame update
+    void Start()
+    {
+        InvokeRepeating("Spawn", 0, 1f);
+    }
 
     // Update is called once per frame
     void Update()
     {
-        if(Input.GetKeyDown(KeyCode.Space))
-        {
-            //randomly spawn debris outside the view of the camera
-            Vector3 spawnPos = new Vector3(transform.position.x + UnityEngine.Random.Range(10, 20), transform.position.y + UnityEngine.Random.Range(10, 20), 0);
+        if(gravity.Objects.Count > 0){
+            for(int i = 0; i < gravity.Objects.Count; i++)
+            {
+                GameObject debrisInstance = (GameObject)gravity.Objects[i];
 
-            // rotation should face origin around z axis
-            Quaternion rotation = Quaternion.Euler(0, 0, Mathf.Atan2(-spawnPos.y, -spawnPos.x) * Mathf.Rad2Deg);
+                if(Vector2.Distance(Vector2.zero, debrisInstance.transform.position) < 10)
+                {
+                    if((Object)gravity.Objects[i] == player){
+                        continue;
+                    }
+
+                    gravity.Objects.RemoveAt(i);
+                    Destroy(debrisInstance);
+                }
+            }
+        }
+    }
+
+    void Spawn(){
+        // calculate player's angle from origin
+        float player_angle = Mathf.Atan2(player.transform.position.y, player.transform.position.x) * Mathf.Rad2Deg;
+
+        //randomly spawn debris outside radius 30 of origin
+        float angle = Random.Range(player_angle - 45, player_angle + 45);
+        float radius = 30;
+        Vector2 spawnPos = new Vector2(radius * Mathf.Cos(angle * Mathf.Deg2Rad), radius * Mathf.Sin(angle * Mathf.Deg2Rad));
+
+        // rotation should face origin around z axis
+        Quaternion rotation = Quaternion.Euler(0, 0, Mathf.Atan2(-spawnPos.y, -spawnPos.x) * Mathf.Rad2Deg + 90);
             
-            GameObject debrisInstance = Instantiate(debris, spawnPos, rotation, this.transform);
-            Rigidbody2D rb = debrisInstance.GetComponent<Rigidbody2D>();
-            rb.AddForce(new Vector2(-spawnPos.normalized.y, -spawnPos.normalized.x), ForceMode2D.Impulse);
-            debrisList.Add(debrisInstance);
-        }
-
-        for(int i = 0; i < debrisList.Count; i++)
-        {
-            GameObject debrisInstance = (GameObject)debrisList[i];
-            Rigidbody2D rb = debrisInstance.GetComponent<Rigidbody2D>();
-
-            Vector2 forceDirection = new Vector2(-debrisInstance.transform.position.normalized.x, -debrisInstance.transform.position.normalized.y) * .5f;
-            Vector2 globalForceDirection = rb.GetRelativeVector(forceDirection);
-
-            rb.AddForce(globalForceDirection, ForceMode2D.Force);
-
-            // Update velocity directly
-            Vector2 newVelocity = new Vector2(1, 0); // replace with your desired velocity
-            Vector2 globalVelocity = rb.GetRelativeVector(newVelocity);
-            rb.velocity = globalVelocity;
-
-            // Adjust velocity based on the world's rotation speed
-            float worldRotationSpeed = 1; // replace with your world's rotation speed
-            rb.velocity += new Vector2(-worldRotationSpeed * debrisInstance.transform.position.y, worldRotationSpeed * debrisInstance.transform.position.x);
-        }
+        GameObject debrisInstance = Instantiate(debris, spawnPos, rotation, this.transform);
+        Rigidbody2D rb = debrisInstance.GetComponent<Rigidbody2D>();
+        rb.AddForce(Vector2.Perpendicular(new Vector2(-spawnPos.normalized.x, -spawnPos.normalized.y) * 300), ForceMode2D.Impulse);
+        gravity.Objects.Add(debrisInstance);
     }
 }
